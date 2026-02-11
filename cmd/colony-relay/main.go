@@ -1,5 +1,5 @@
 // ABOUTME: Entry point for the colony-relay CLI
-// ABOUTME: Dispatches subcommands: start, say, hear, log, init, status
+// ABOUTME: Dispatches subcommands: start, say, hear, init, status
 
 package main
 
@@ -29,8 +29,6 @@ func main() {
 		exitCode = runInit(args)
 	case "status":
 		exitCode = runStatus(args)
-	case "log":
-		exitCode = runLog(args)
 	case "-h", "--help", "help":
 		printUsage()
 		exitCode = 0
@@ -54,7 +52,6 @@ Commands:
   start    Start the relay server
   say      Send a message
   hear     Receive messages
-  log      Show message history
   status   Check relay status
 
 Run 'colony-relay <command> --help' for details on each command.
