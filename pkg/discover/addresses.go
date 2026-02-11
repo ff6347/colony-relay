@@ -4,6 +4,7 @@
 package discover
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"os/exec"
@@ -30,8 +31,8 @@ func ListenAddresses(port int) []string {
 		add(ip)
 	}
 
-	if ip := tailscaleIP(); ip != "" {
-		add(ip)
+	if host := tailscaleHost(); host != "" {
+		add(host)
 	}
 
 	return addrs
@@ -73,16 +74,22 @@ func lanIPs() []string {
 	return ips
 }
 
-func tailscaleIP() string {
-	out, err := exec.Command("tailscale", "ip", "-4").Output()
+func tailscaleHost() string {
+	out, err := exec.Command("tailscale", "status", "--json").Output()
 	if err != nil {
 		return ""
 	}
+	return parseTailscaleHost(out)
+}
 
-	ip := strings.TrimSpace(string(out))
-	if net.ParseIP(ip) == nil {
+func parseTailscaleHost(data []byte) string {
+	var status struct {
+		Self struct {
+			DNSName string `json:"DNSName"`
+		} `json:"Self"`
+	}
+	if err := json.Unmarshal(data, &status); err != nil {
 		return ""
 	}
-
-	return ip
+	return strings.TrimSuffix(strings.TrimSpace(status.Self.DNSName), ".")
 }

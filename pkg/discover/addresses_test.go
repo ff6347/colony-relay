@@ -44,6 +44,49 @@ func TestListenAddresses_AllAddressesAreHTTP(t *testing.T) {
 	}
 }
 
+func TestParseTailscaleHost(t *testing.T) {
+	tests := []struct {
+		name string
+		json string
+		want string
+	}{
+		{
+			name: "valid dns name with trailing dot",
+			json: `{"Self":{"DNSName":"myhost.tailnet.ts.net."}}`,
+			want: "myhost.tailnet.ts.net",
+		},
+		{
+			name: "valid dns name without trailing dot",
+			json: `{"Self":{"DNSName":"myhost.tailnet.ts.net"}}`,
+			want: "myhost.tailnet.ts.net",
+		},
+		{
+			name: "empty dns name",
+			json: `{"Self":{"DNSName":""}}`,
+			want: "",
+		},
+		{
+			name: "missing self",
+			json: `{}`,
+			want: "",
+		},
+		{
+			name: "invalid json",
+			json: `not json`,
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseTailscaleHost([]byte(tt.json))
+			if got != tt.want {
+				t.Errorf("parseTailscaleHost() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestListenAddresses_NoDuplicates(t *testing.T) {
 	addrs := ListenAddresses(4100)
 	seen := make(map[string]bool)
