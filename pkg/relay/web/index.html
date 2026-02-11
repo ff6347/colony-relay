@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<!--
+ABOUTME: Web UI for the relay message server
+ABOUTME: Terminal-style interface with SSE streaming and message input
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relay</title>
+    <style>
+        :root {
+            --bg: #000000;
+            --bg-dim: #1a1a1a;
+            --fg: #e0e0e0;
+            --fg-dim: #585858;
+            --accent: #5f5fd7;
+            --accent-text: #ffffd7;
+            --sender: #5fffd7;
+            --connected: #00d787;
+            --disconnected: #ff0000;
+            --border: #585858;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background-color: var(--bg);
+            color: var(--fg);
+            font-family: monospace;
+            font-size: 14px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 8px;
+            margin: 0 auto;
+            max-width: 800px;
+        }
+        #status {
+            background: var(--accent);
+            color: var(--accent-text);
+            padding: 4px 8px;
+            margin-bottom: 8px;
+        }
+        #status.connected::before {
+            content: "● ";
+            color: var(--connected);
+        }
+        #status.disconnected {
+            background: var(--bg-dim);
+            color: var(--disconnected);
+        }
+        #status.disconnected::before {
+            content: "○ ";
+        }
+        #messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 0;
+            display: grid;
+            grid-template-columns: max-content minmax(0, 70ch);
+            gap: 16px 16px;
+            align-content: start;
+        }
+        .message {
+            display: contents;
+        }
+        .message .meta {
+            display: flex;
+            flex-direction: column;
+            white-space: nowrap;
+        }
+        .message .ts {
+            color: var(--fg-dim);
+        }
+        .message .sender {
+            color: var(--sender);
+            font-weight: bold;
+        }
+        .message .sender::after {
+            content: ":";
+        }
+        .message .body {
+            color: var(--fg);
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        @media (max-width: 640px) {
+            #messages {
+                display: block;
+            }
+            .message {
+                display: block;
+                padding: 8px;
+            }
+            .message:nth-child(odd) {
+                background: var(--bg-dim);
+            }
+            .message .meta {
+                flex-direction: row;
+                gap: 8px;
+                margin-bottom: 2px;
+            }
+            .message .ts {
+                font-size: inherit;
+            }
+            .message .sender::after {
+                content: "";
+            }
+            .message .body {
+                display: block;
+            }
+        }
+        #input-area {
+            display: flex;
+            gap: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border);
+        }
+        #sender {
+            width: 120px;
+            background: var(--bg-dim);
+            border: 1px solid var(--border);
+            color: var(--fg);
+            font-family: monospace;
+            font-size: 14px;
+            padding: 8px;
+        }
+        #body {
+            flex: 1;
+            background: var(--bg-dim);
+            border: 1px solid var(--border);
+            color: var(--fg);
+            font-family: monospace;
+            font-size: 14px;
+            padding: 8px;
+        }
+        #send {
+            background: var(--accent);
+            border: 1px solid var(--accent);
+            color: var(--accent-text);
+            font-family: monospace;
+            font-size: 14px;
+            padding: 8px 16px;
+            cursor: pointer;
+        }
+        #send:hover {
+            filter: brightness(1.2);
+        }
+        #send:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        input:focus, button:focus {
+            outline: 1px solid var(--sender);
+        }
+    </style>
+</head>
+<body>
+    <div id="status" class="disconnected">Disconnected</div>
+    <div id="messages"></div>
+    <div id="input-area">
+        <input type="text" id="sender" placeholder="sender" value="">
+        <input type="text" id="body" placeholder="message body">
+        <button id="send">Send</button>
+    </div>
+
+    <script>
+        const statusEl = document.getElementById('status');
+        const messagesEl = document.getElementById('messages');
+        const senderEl = document.getElementById('sender');
+        const bodyEl = document.getElementById('body');
+        const sendBtn = document.getElementById('send');
+
+        let eventSource = null;
+
+        function formatTime(ts) {
+            const d = new Date(ts);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const h = String(d.getHours()).padStart(2, '0');
+            const m = String(d.getMinutes()).padStart(2, '0');
+            const s = String(d.getSeconds()).padStart(2, '0');
+            return year + '-' + month + '-' + day + ' ' + h + ':' + m + ':' + s;
+        }
+
+        function addMessage(msg) {
+            const div = document.createElement('div');
+            div.className = 'message';
+            div.innerHTML = '<div class="meta"><span class="ts">' + formatTime(msg.ts) + '</span>' +
+                '<span class="sender">' + escapeHtml(msg.from) + '</span></div>' +
+                '<span class="body">' + escapeHtml(msg.body) + '</span>';
+            messagesEl.appendChild(div);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function connect() {
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            eventSource = new EventSource('/stream');
+
+            eventSource.onopen = function() {
+                statusEl.textContent = 'Connected';
+                statusEl.className = 'connected';
+            };
+
+            eventSource.onmessage = function(e) {
+                try {
+                    const msg = JSON.parse(e.data);
+                    addMessage(msg);
+                } catch (err) {
+                    console.error('Failed to parse message:', err);
+                }
+            };
+
+            eventSource.onerror = function() {
+                statusEl.textContent = 'Disconnected';
+                statusEl.className = 'disconnected';
+                eventSource.close();
+                setTimeout(connect, 2000);
+            };
+        }
+
+        async function sendMessage() {
+            const from = senderEl.value.trim();
+            const body = bodyEl.value.trim();
+
+            if (!from || !body) {
+                return;
+            }
+
+            sendBtn.disabled = true;
+
+            try {
+                const response = await fetch('/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ from: from, body: body })
+                });
+
+                if (response.ok) {
+                    bodyEl.value = '';
+                    bodyEl.focus();
+                } else {
+                    console.error('Failed to send message:', await response.text());
+                }
+            } catch (err) {
+                console.error('Failed to send message:', err);
+            } finally {
+                sendBtn.disabled = false;
+            }
+        }
+
+        sendBtn.addEventListener('click', sendMessage);
+
+        bodyEl.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        async function loadRecent() {
+            try {
+                const response = await fetch('/messages?limit=50');
+                if (response.ok) {
+                    const messages = await response.json();
+                    messages.forEach(addMessage);
+                }
+            } catch (err) {
+                console.error('Failed to load recent messages:', err);
+            }
+        }
+
+        loadRecent();
+        connect();
+    </script>
+</body>
+</html>
