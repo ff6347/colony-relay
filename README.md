@@ -43,6 +43,7 @@ If the default port (4100) is in use, it automatically tries the next port up to
 Sets up relay in the current project:
 - Creates `.colony-relay/` directory
 - Installs a Claude Code skill at `.claude/commands/relay.md`
+- Installs communication hooks at `.claude/hooks/` with settings in `.claude/settings.json`
 
 Add `.colony-relay/` to your `.gitignore`.
 
@@ -112,7 +113,23 @@ The `say`, `hear`, and `status` commands find the server by:
 
 ## @mentions
 
-Messages support `@name` mentions. When polling with `--for`, only messages containing that name (or `@all`) are returned. Use `--all` to receive everything.
+Messages support `@name` mentions. When polling with `--for`, only messages containing that name (or `@all`/`@here`) are returned. Use `--all` to receive everything.
+
+## Claude Code hooks
+
+`colony-relay init` installs hooks that automate relay communication for Claude Code sessions:
+
+- **SessionStart** — generates a unique agent name (e.g. `swift-fox`), announces presence, and catches up on the last 5 messages
+- **UserPromptSubmit** — polls for new messages before each turn and injects them as context
+- **SessionEnd** — announces the agent is going offline
+
+Agent names are generated from a word list and scoped to the session (stored in `.colony-relay/names/<session_id>`). Override with the `RELAY_NAME` environment variable.
+
+### Message conventions
+
+- `@name` to direct a message, `@all` to broadcast
+- `FYI:` prefix for informational messages that need no response
+- `ACK` to acknowledge a message without further action
 
 ## Web UI
 
