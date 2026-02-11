@@ -62,6 +62,7 @@ func runStart(args []string) int {
 	// Create server
 	srv := relay.NewServer(store)
 	srv.SetPresenceMinutes(*presenceMinutes)
+	srv.SetLog(os.Stdout)
 
 	// Find available port
 	listener, actualPort, err := listenWithAutoIncrement(*port, maxPortAttempts)

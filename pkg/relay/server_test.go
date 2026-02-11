@@ -522,6 +522,40 @@ func TestPresenceOnGetForEntity(t *testing.T) {
 	}
 }
 
+func TestMessageLog(t *testing.T) {
+	srv := setupTestServer(t)
+
+	var buf bytes.Buffer
+	srv.SetLog(&buf)
+
+	postTestMessage(t, srv, "alice", "hello @bob")
+	postTestMessage(t, srv, "bob", "hi alice")
+
+	output := buf.String()
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 log lines, got %d: %q", len(lines), output)
+	}
+
+	if !strings.Contains(lines[0], "alice") {
+		t.Errorf("expected alice in first line, got: %s", lines[0])
+	}
+	if !strings.Contains(lines[0], "hello @bob") {
+		t.Errorf("expected message body in first line, got: %s", lines[0])
+	}
+	if !strings.Contains(lines[1], "bob") {
+		t.Errorf("expected bob in second line, got: %s", lines[1])
+	}
+}
+
+func TestMessageLogDisabledByDefault(t *testing.T) {
+	srv := setupTestServer(t)
+
+	// No SetLog call - should not panic
+	postTestMessage(t, srv, "alice", "hello")
+}
+
 func TestUIEndpoint(t *testing.T) {
 	srv := setupTestServer(t)
 

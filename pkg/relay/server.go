@@ -7,6 +7,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"sync"
@@ -23,6 +24,8 @@ type Server struct {
 	store           *Store
 	mux             *http.ServeMux
 	presenceMinutes float64
+
+	log io.Writer
 
 	// SSE subscriber management
 	subscribersMu sync.RWMutex
@@ -47,6 +50,11 @@ func NewServer(store *Store) *Server {
 // SetPresenceMinutes sets the presence timeout window
 func (s *Server) SetPresenceMinutes(minutes float64) {
 	s.presenceMinutes = minutes
+}
+
+// SetLog enables message logging to the given writer
+func (s *Server) SetLog(w io.Writer) {
+	s.log = w
 }
 
 // ServeHTTP implements http.Handler
@@ -132,6 +140,10 @@ func (s *Server) postMessage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "store error: "+err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	if s.log != nil {
+		fmt.Fprintf(s.log, "[%s] %s: %s\n", msg.Timestamp.Format("2006-01-02T15:04:05Z"), msg.Sender, msg.Body)
 	}
 
 	// Update presence for sender
