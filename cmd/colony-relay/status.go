@@ -39,6 +39,10 @@ func runStatus(args []string) int {
 			if processAlive(pid) {
 				port, _ := discover.ReadPort(relayDir)
 				fmt.Printf("relay running (pid %d, port %d)\n", pid, port)
+				addrs := discover.ListenAddresses(port)
+				for _, addr := range addrs {
+					fmt.Printf("  %s\n", addr)
+				}
 				printServerInfo(*server, port)
 				return 0
 			}

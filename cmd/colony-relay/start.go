@@ -102,7 +102,11 @@ func runStart(args []string) int {
 
 	// Start serving
 	go func() {
-		fmt.Fprintf(os.Stderr, "relay listening on http://localhost:%d\n", actualPort)
+		addrs := discover.ListenAddresses(actualPort)
+		fmt.Fprintf(os.Stderr, "relay listening on:\n")
+		for _, addr := range addrs {
+			fmt.Fprintf(os.Stderr, "  %s\n", addr)
+		}
 		if err := httpServer.Serve(listener); err != nil && err != http.ErrServerClosed {
 			fmt.Fprintf(os.Stderr, "server error: %v\n", err)
 		}
